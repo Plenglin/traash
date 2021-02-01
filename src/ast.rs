@@ -1,18 +1,19 @@
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SingleCommand {
-    pub(crate) args: Vec<String>
+    pub(crate) args: Vec<String>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Fork {
-    children: Vec<Box<Command>>,
-    wait: bool,
+    pub first: Box<Command>,
+    pub second: Box<Command>,
+    pub wait: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Sequential {
-    pub(crate) first: Box<Command>,
-    pub(crate) second: Box<Command>
+    pub first: Box<Command>,
+    pub second: Box<Command>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

@@ -1,48 +1,66 @@
 use std::ops::Index;
 
+use crate::ast::Command::Nil;
 use crate::ast::{Command, Sequential, SingleCommand};
 use crate::parser::Command::Single;
+use crate::parser::Symbol::Text;
 use crate::tokens::Token;
-use crate::ast::Command::Nil;
 
-fn read_next_single_command(mut tokens: &[Token]) -> (Command, &[Token]) {
-    let mut args = vec![];
-
-    loop {
-        match tokens.first() {
-            Some(Token::Text(str)) => args.push(str.to_string()),
-            _ => break
-        }
-        tokens = &tokens[1..];
-    }
-
-    (if args.is_empty() { Nil } else { Command::Single(SingleCommand { args }) }, tokens)
+enum Symbol {
+    Text(String),
+    Command(Command),
 }
 
-pub fn parse(mut tokens: &[Token]) -> Command {
-    if tokens.is_empty() {
-        return Nil
+struct Parser<'a> {
+    tokens: &'a [Token],
+    stack: Vec<Symbol>,
+}
+
+impl Parser<'_> {
+    fn new(tokens: &[Token]) -> Parser {
+        Parser {
+            tokens,
+            stack: vec![],
+        }
+    }
+}
+
+impl Parser<'_> {
+    fn reduce_single(self: &mut Self) -> SingleCommand {
+        let mut args: Vec<String> = vec![];
+        while let Some(Symbol::Text(str)) = self.stack.last() {
+            args.push(str.clone());
+            self.stack.pop();
+        }
+        SingleCommand { args }
     }
 
-    let mut stack: Vec<Command> = vec![];
+    fn parse(self: &mut Self) -> Command {
+        loop {
+            let token = match self.tokens.first() {
+                Some(t) => t,
+                None => break,
+            };
 
-    while !tokens.is_empty() {
-        match tokens.first() {
-            Some(Token::Text(str)) => {
-                let (cmd, t) = read_next_single_command(tokens);
-                tokens = t;
-                stack.push(cmd);
+            match token {
+                Token::Text(str) => self.stack.push(Text(str.clone())),
+                Token::Fork => {
+                    let cmd = self.reduce_single();
+                }
+                _ => {}
             }
-            Some(Token::Semicolon) => {
-                let first = stack.pop().unwrap();
-                let (cmd, t) = read_next_single_command(&tokens[1..]);
-                tokens = t;
-                stack.push(Command::Sequential(Sequential { first: Box::new(first), second: Box::new(cmd) }));
-            }
-            _ => {}
-        };
+        }
+        self.reduce_single();
+        match self.stack.pop() {
+            Some(Symbol::Command(cmd)) => cmd,
+            _ => panic!(),
+        }
     }
-    stack.pop().unwrap()
+}
+
+pub fn parse<'a>(tokens: &'a [Token]) -> Command {
+    let mut parser = Parser::new(tokens);
+    parser.parse()
 }
 
 #[test]
@@ -61,9 +79,12 @@ fn parses_single_command() {
     ];
     let result = parse(tokens.as_slice());
 
-    assert_eq!(result, Command::Single(SingleCommand {
-        args: vec!["echo".to_string(), "foo".to_string()]
-    }));
+    assert_eq!(
+        result,
+        Command::Single(SingleCommand {
+            args: vec!["echo".to_string(), "foo".to_string()]
+        })
+    );
 }
 
 #[test]
@@ -83,16 +104,16 @@ fn parses_sequential_command() {
     assert_eq!(
         result,
         Command::Sequential(Sequential {
-            first: Box::new(Command::Sequential(Sequential {
+            first: Box::new(Command::Single(SingleCommand {
+                args: vec!["echo".to_string(), "foo".to_string()]
+            })),
+            second: Box::new(Command::Sequential(Sequential {
                 first: Box::new(Command::Single(SingleCommand {
-                    args: vec!["echo".to_string(), "foo".to_string()]
-                })),
-                second: Box::new(Command::Single(SingleCommand {
                     args: vec!["echo".to_string(), "bar".to_string()]
                 })),
-            })),
-            second: Box::new(Command::Single(SingleCommand {
-                args: vec!["echo".to_string(), "spam".to_string()]
+                second: Box::new(Command::Single(SingleCommand {
+                    args: vec!["echo".to_string(), "spam".to_string()]
+                })),
             })),
         }),
     );
