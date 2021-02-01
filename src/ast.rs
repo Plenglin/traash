@@ -36,6 +36,7 @@ pub struct FileOutput {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Command {
+    Nil,
     Single(SingleCommand),
     Fork(Fork),
     Sequential(Sequential),
