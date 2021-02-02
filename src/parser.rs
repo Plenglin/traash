@@ -1,7 +1,9 @@
 use crate::ast::Command::Nil;
 use crate::ast::{binary, fork, log_and, sequential, single, BinaryOp, Command, SingleCommand};
 use crate::parser::Command::Single;
+use crate::parser::ParserError::ExtraRParen;
 use crate::tokens::Token;
+use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Symbol {
@@ -9,6 +11,21 @@ enum Symbol {
     BinaryOp(Command, BinaryOp),
     Command(Command),
     LParen,
+}
+
+#[derive(Debug)]
+pub enum ParserError {
+    ExtraRParen,
+    MissingRParen,
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParserError::ExtraRParen => write!(f, "there was an extra right parenthesis"),
+            ParserError::MissingRParen => write!(f, "there was an missing right parenthesis"),
+        }
+    }
 }
 
 struct Parser<'a> {
@@ -65,7 +82,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse(self: &mut Self) -> Command {
+    fn parse(self: &mut Self) -> Result<Command, ParserError> {
         // Read through tokens
         loop {
             let token = match self.tokens.first() {
@@ -73,22 +90,34 @@ impl Parser<'_> {
                 None => break,
             };
 
-            if let Token::Text(str) = token {
-                self.stack.push(Symbol::Text(str.clone()))
-            } else if let Some(op) = BinaryOp::from(token) {
+            let push = if let Some(op) = BinaryOp::from(token) {
                 let command = self.reduce();
-                self.stack.push(Symbol::BinaryOp(command, op));
-            }
+                Symbol::BinaryOp(command, op)
+            } else {
+                match token {
+                    Token::Text(str) => Symbol::Text(str.clone()),
+                    Token::LParen => Symbol::LParen,
+                    Token::RParen => {
+                        let command = self.reduce();
+                        match self.stack.pop() {
+                            Some(Symbol::LParen) => Symbol::Command(command),
+                            _ => Err(ExtraRParen)?,
+                        }
+                    }
+                    _ => panic!(),
+                }
+            };
+            self.stack.push(push);
 
             self.tokens = &self.tokens[1..];
         }
 
         // Clear out the stack
-        self.reduce()
+        Ok(self.reduce())
     }
 }
 
-pub fn parse(tokens: &[Token]) -> Command {
+pub fn parse(tokens: &[Token]) -> Result<Command, ParserError> {
     let mut parser = Parser::new(tokens);
     parser.parse()
 }
@@ -96,7 +125,7 @@ pub fn parse(tokens: &[Token]) -> Command {
 #[test]
 fn parses_empty_tokens() {
     let tokens = vec![];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(result, Command::Nil);
 }
@@ -104,7 +133,7 @@ fn parses_empty_tokens() {
 #[test]
 fn parses_single_command() {
     let tokens = vec![Token::text("echo"), Token::text("foo")];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
@@ -126,7 +155,7 @@ fn parses_chained_binary_command() {
         Token::text("echo"),
         Token::text("spam"),
     ];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
@@ -154,7 +183,7 @@ fn reorders_binary_chain_with_paren() {
         Token::text("spam"),
         Token::RParen,
     ];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
@@ -177,7 +206,7 @@ fn parses_binary_command_with_trailing_op() {
         Token::text("echo"),
         Token::Fork,
     ];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
@@ -200,7 +229,7 @@ fn parses_happy_command_with_parentheses() {
         Token::text("echo"),
         Token::RParen,
     ];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
@@ -225,7 +254,7 @@ fn parses_happy_command_with_nested_parentheses() {
         Token::text("apt"),
         Token::RParen,
     ];
-    let result = parse(tokens.as_slice());
+    let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(
         result,
