@@ -67,7 +67,11 @@ impl Parser<'_> {
                 }
                 Some(Symbol::Command(cmd)) => match self.stack.pop() {
                     Some(Symbol::BinaryOp(left, op)) => Symbol::Command(binary(op, left, cmd)),
-                    Some(Symbol::LParen) | None => {
+                    Some(Symbol::LParen) => {
+                        self.stack.push(Symbol::LParen);
+                        return cmd;
+                    }
+                    None => {
                         return cmd;
                     }
                     _ => continue,
