@@ -1,15 +1,3 @@
-## The Language
+# The *t*otally *r*adical *a*nd *a*wesome *sh*ell (traash)  
 
-```
-SEMICOLON: ";"
-
-```
-
-```bnf
-<text-array> ::= <text> <text-array> | ""
-<single> ::= <text-array>
-<sequential> ::= <command> ; <command>
-<fork> ::= <command> & <command>
- 
-<command> ::= <single> | <sequential> | <fork>
-```
+A fun little bash-like shell I'm making for fun. 
