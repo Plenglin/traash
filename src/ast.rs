@@ -1,6 +1,4 @@
-use crate::ast::BinaryOp::{Fork, Seq};
 use crate::tokens::Token;
-use crate::tokens::Token::LogAnd;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SingleCommand {

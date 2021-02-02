@@ -1,10 +1,9 @@
-use std::ops::Index;
-
 use crate::ast::Command::Nil;
-use crate::ast::{binary, sequential, single, BinaryOp, Command, SingleCommand};
+use crate::ast::{binary, fork, sequential, single, BinaryOp, Command, SingleCommand};
 use crate::parser::Command::Single;
 use crate::tokens::Token;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum Symbol {
     Text(String),
     BinaryOp(Command, BinaryOp),
@@ -56,10 +55,11 @@ impl Parser<'_> {
                     }
                     _ => continue,
                 },
+                Some(Symbol::BinaryOp(left, op)) => Symbol::Command(binary(op, left, Nil)),
                 None => {
                     return Nil;
                 }
-                _ => panic!(),
+                Some(x) => panic!("Encountered a {:#?}", x),
             };
             self.stack.push(push);
         }
@@ -118,7 +118,7 @@ fn parses_single_command() {
 }
 
 #[test]
-fn parses_sequential_command() {
+fn parses_chained_binary_command() {
     let tokens = vec![
         Token::Text("echo".to_string()),
         Token::Text("foo".to_string()),
@@ -139,6 +139,29 @@ fn parses_sequential_command() {
                 single(vec!["echo".to_string(), "bar".to_string()]),
             ),
             single(vec!["echo".to_string(), "spam".to_string()])
+        )
+    );
+}
+
+#[test]
+fn parses_binary_command_with_trailing_op() {
+    let tokens = vec![
+        Token::Text("echo".to_string()),
+        Token::Text("foo".to_string()),
+        Token::Semicolon,
+        Token::Text("echo".to_string()),
+        Token::Fork,
+    ];
+    let result = parse(tokens.as_slice());
+
+    assert_eq!(
+        result,
+        fork(
+            sequential(
+                single(vec!["echo".to_string(), "foo".to_string()]),
+                single(vec!["echo".to_string()]),
+            ),
+            Nil
         )
     );
 }

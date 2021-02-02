@@ -1,11 +1,10 @@
-use std::iter::Map;
-use std::str::Split;
-use crate::tokens::Token::*;
 use crate::tokens::Token;
+use crate::tokens::Token::*;
 
 pub fn lex(input: &str) -> Vec<Token> {
-    input.split(" ").map(|tok|{
-        match tok {
+    input
+        .split(" ")
+        .map(|tok| match tok {
             "|" => Pipe,
             "&" => Fork,
             "&&" => LogAnd,
@@ -15,9 +14,9 @@ pub fn lex(input: &str) -> Vec<Token> {
             ">>" => AppendFile,
             "(" => LParen,
             ")" => RParen,
-            t => Text(t.to_string())
-        }
-    }).collect()
+            t => Text(t.to_string()),
+        })
+        .collect()
 }
 
 #[test]
