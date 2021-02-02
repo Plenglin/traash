@@ -1,7 +1,7 @@
 use crate::ast::Command::Nil;
 use crate::ast::{binary, fork, log_and, sequential, single, BinaryOp, Command, SingleCommand};
 use crate::parser::Command::Single;
-use crate::parser::ParserError::ExtraRParen;
+use crate::parser::ParserError::{ExtraRParen, MissingRParen};
 use crate::tokens::Token;
 use std::fmt;
 
@@ -13,7 +13,7 @@ enum Symbol {
     LParen,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ParserError {
     ExtraRParen,
     MissingRParen,
@@ -117,7 +117,12 @@ impl Parser<'_> {
         }
 
         // Clear out the stack
-        Ok(self.reduce())
+        let result = self.reduce();
+        match self.stack.last() {
+            None => Ok(result),
+            Some(Symbol::LParen) => Err(MissingRParen),
+            _ => panic!(),
+        }
     }
 }
 
@@ -270,4 +275,31 @@ fn parses_happy_command_with_nested_parentheses() {
             )
         )
     );
+}
+
+#[test]
+fn errors_on_extra_right_paren() {
+    let tokens = vec![
+        Token::text("uptime"),
+        Token::Semicolon,
+        Token::LParen,
+        Token::text("echo"),
+        Token::RParen,
+        Token::RParen,
+    ];
+    let result = parse(tokens.as_slice());
+    assert_eq!(result, Err(ParserError::ExtraRParen))
+}
+
+#[test]
+fn errors_on_missing_right_paren() {
+    let tokens = vec![
+        Token::Semicolon,
+        Token::LParen,
+        Token::LParen,
+        Token::text("echo"),
+        Token::RParen,
+    ];
+    let result = parse(tokens.as_slice());
+    assert_eq!(result, Err(ParserError::MissingRParen))
 }
