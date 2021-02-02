@@ -266,7 +266,7 @@ fn parses_happy_command_with_nested_parentheses() {
             single(vec!["uptime".to_string()]),
             log_and(
                 fork(single(vec!["echo".to_string()]), Nil),
-                single(vec!["echo".to_string()]),
+                single(vec!["apt".to_string()]),
             )
         )
     );
