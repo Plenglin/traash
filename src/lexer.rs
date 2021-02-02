@@ -63,11 +63,10 @@ fn read_operator(mut in_str: &str, operator: char) -> (&str, i8) {
 }
 
 fn skip_whitespace(mut in_str: &str) -> &str {
-    while let Some(x) = in_str.get(0..1) {
-        match x {
-            " " => 1,
-            _ => break,
-        };
+    while let Some(x) = in_str.chars().next() {
+        if !x.is_whitespace() {
+            break;
+        }
         in_str = &in_str[1..];
     }
     in_str
@@ -106,6 +105,8 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexerError> {
             };
             tokens.push(token);
             input = t;
+        } else {
+            panic!("Unknown character {}", c)
         }
     }
     Ok(tokens)
@@ -148,7 +149,7 @@ fn escapes_chars() {
 
 #[test]
 fn optional_whitespace() {
-    let in_str = "echo;token&alpha||beta";
+    let in_str = "echo;tok&&en&alpha||beta>>     \tend";
 
     let output = lex(in_str).unwrap();
 
@@ -157,11 +158,15 @@ fn optional_whitespace() {
         vec![
             Token::text("echo"),
             Semicolon,
-            Token::text("token"),
+            Token::text("tok"),
+            LogAnd,
+            Token::text("en"),
             Fork,
             Token::text("alpha"),
             LogOr,
-            Token::text("beta")
+            Token::text("beta"),
+            AppendFile,
+            Token::text("end"),
         ]
     )
 }

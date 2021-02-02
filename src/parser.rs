@@ -1,8 +1,10 @@
+use crate::ast::BinaryOp::LogAnd;
 use crate::ast::Command::Nil;
 use crate::ast::{binary, fork, log_and, sequential, single, BinaryOp, Command, SingleCommand};
 use crate::parser::Command::Single;
 use crate::parser::ParserError::{ExtraRParen, MissingRParen};
 use crate::tokens::Token;
+use crate::tokens::Token::Semicolon;
 use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -136,6 +138,14 @@ fn parses_empty_tokens() {
     let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(result, Command::Nil);
+}
+
+#[test]
+fn parses_empty_commands() {
+    let tokens = vec![Token::Semicolon, Token::Semicolon, Token::LogAnd];
+    let result = parse(tokens.as_slice()).unwrap();
+
+    assert_eq!(result, log_and(sequential(sequential(Nil, Nil), Nil), Nil));
 }
 
 #[test]
