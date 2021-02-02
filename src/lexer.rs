@@ -21,23 +21,23 @@ pub fn lex(input: &str) -> Vec<Token> {
 
 #[test]
 fn lexes_fork_command() {
-    let text = "echo this is a --test & cat ./foo.bar > carp";
+    let in_str = "echo this is a --test & cat ./foo.bar > carp";
 
-    let output = lex(text);
+    let output = lex(in_str);
 
     assert_eq!(
         output,
         vec![
-            Text("echo".to_string()),
-            Text("this".to_string()),
-            Text("is".to_string()),
-            Text("a".to_string()),
-            Text("--test".to_string()),
+            Token::text("echo"),
+            Token::text("this"),
+            Token::text("is"),
+            Token::text("a"),
+            Token::text("--test"),
             Fork,
-            Text("cat".to_string()),
-            Text("./foo.bar".to_string()),
+            Token::text("cat"),
+            Token::text("./foo.bar"),
             WriteFile,
-            Text("carp".to_string()),
+            Token::text("carp"),
         ]
     )
 }
