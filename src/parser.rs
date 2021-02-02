@@ -32,6 +32,7 @@ impl Parser<'_> {
             args.push(str.clone());
             self.stack.pop();
         }
+        args.reverse();
         SingleCommand { args }
     }
 
@@ -49,10 +50,14 @@ impl Parser<'_> {
                 }
                 _ => {}
             }
+
+            self.tokens = &self.tokens[1..];
         }
-        self.reduce_single();
+        let last = Symbol::Command(Command::Single(self.reduce_single()));
+        self.stack.push(last);
         match self.stack.pop() {
             Some(Symbol::Command(cmd)) => cmd,
+            None => Nil,
             _ => panic!(),
         }
     }
