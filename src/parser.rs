@@ -94,11 +94,12 @@ impl Parser<'_> {
                 None => break,
             };
 
-            let push = if let Some(op) = BinaryOp::from(token) {
-                let command = self.reduce();
-                Symbol::BinaryOp(command, op)
-            } else {
-                match token {
+            let push = match BinaryOp::from(token) {
+                Some(op) => {
+                    let command = self.reduce();
+                    Symbol::BinaryOp(command, op)
+                }
+                None => match token {
                     Token::Text(str) => Symbol::Text(str.clone()),
                     Token::LParen => Symbol::LParen,
                     Token::RParen => {
@@ -109,7 +110,7 @@ impl Parser<'_> {
                         }
                     }
                     _ => panic!(),
-                }
+                },
             };
             self.stack.push(push);
 
