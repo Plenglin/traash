@@ -1,5 +1,5 @@
 use crate::ast::Command::Nil;
-use crate::ast::{binary, fork, sequential, single, BinaryOp, Command, SingleCommand};
+use crate::ast::{binary, fork, log_and, sequential, single, BinaryOp, Command, SingleCommand};
 use crate::parser::Command::Single;
 use crate::tokens::Token;
 
@@ -141,6 +141,34 @@ fn parses_chained_binary_command() {
 }
 
 #[test]
+fn reorders_binary_chain_with_paren() {
+    let tokens = vec![
+        Token::text("echo"),
+        Token::text("foo"),
+        Token::Semicolon,
+        Token::LParen,
+        Token::text("echo"),
+        Token::text("bar"),
+        Token::Semicolon,
+        Token::text("echo"),
+        Token::text("spam"),
+        Token::RParen,
+    ];
+    let result = parse(tokens.as_slice());
+
+    assert_eq!(
+        result,
+        sequential(
+            single(vec!["echo".to_string(), "foo".to_string()]),
+            sequential(
+                single(vec!["echo".to_string(), "bar".to_string()]),
+                single(vec!["echo".to_string(), "spam".to_string()])
+            )
+        )
+    );
+}
+
+#[test]
 fn parses_binary_command_with_trailing_op() {
     let tokens = vec![
         Token::text("echo"),
@@ -159,6 +187,54 @@ fn parses_binary_command_with_trailing_op() {
                 single(vec!["echo".to_string()]),
             ),
             Nil
+        )
+    );
+}
+
+#[test]
+fn parses_happy_command_with_parentheses() {
+    let tokens = vec![
+        Token::LParen,
+        Token::text("uptime"),
+        Token::Semicolon,
+        Token::text("echo"),
+        Token::RParen,
+    ];
+    let result = parse(tokens.as_slice());
+
+    assert_eq!(
+        result,
+        sequential(
+            single(vec!["uptime".to_string()]),
+            single(vec!["echo".to_string()]),
+        )
+    );
+}
+
+#[test]
+fn parses_happy_command_with_nested_parentheses() {
+    let tokens = vec![
+        Token::text("uptime"),
+        Token::Semicolon,
+        Token::LParen,
+        Token::LParen,
+        Token::text("echo"),
+        Token::Fork,
+        Token::RParen,
+        Token::LogAnd,
+        Token::text("apt"),
+        Token::RParen,
+    ];
+    let result = parse(tokens.as_slice());
+
+    assert_eq!(
+        result,
+        sequential(
+            single(vec!["uptime".to_string()]),
+            log_and(
+                fork(single(vec!["echo".to_string()]), Nil),
+                single(vec!["echo".to_string()]),
+            )
         )
     );
 }
