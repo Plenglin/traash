@@ -23,7 +23,11 @@ fn is_operator(c: char) -> bool {
 }
 
 fn is_text(c: char) -> bool {
-    return c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/';
+    match c {
+        _ if c.is_alphanumeric() => true,
+        '-' | '_' | '.' | '/' => true,
+        _ => false,
+    }
 }
 
 fn read_text(mut in_str: &str) -> Result<(&str, String), LexerError> {
@@ -76,7 +80,13 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexerError> {
             None => break,
             Some(c) => c,
         };
-        if c.is_whitespace() {
+        if c == '(' {
+            tokens.push(LParen);
+            input = &input[1..];
+        } else if c == ')' {
+            tokens.push(RParen);
+            input = &input[1..];
+        } else if c.is_whitespace() {
             input = skip_whitespace(input);
         } else if is_text(c) {
             let (t, text) = read_text(input)?;
@@ -154,4 +164,35 @@ fn optional_whitespace() {
             Token::text("beta")
         ]
     )
+}
+
+#[test]
+fn lexes_parentheses() {
+    let in_str = "(echo(   token(alpha)beta(";
+
+    let output = lex(in_str).unwrap();
+
+    assert_eq!(
+        output,
+        vec![
+            LParen,
+            Token::text("echo"),
+            LParen,
+            Token::text("token"),
+            LParen,
+            Token::text("alpha"),
+            RParen,
+            Token::text("beta"),
+            LParen
+        ]
+    )
+}
+
+#[test]
+fn errors_on_invalid_operators() {
+    let in_str = "foo;;bar&alpha||beta";
+
+    let output = lex(in_str);
+
+    assert_eq!(output, Err(UnknownOperator(";;".to_string())))
 }
