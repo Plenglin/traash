@@ -103,10 +103,7 @@ fn parses_empty_tokens() {
 
 #[test]
 fn parses_single_command() {
-    let tokens = vec![
-        Token::Text("echo".to_string()),
-        Token::Text("foo".to_string()),
-    ];
+    let tokens = vec![Token::text("echo"), Token::text("foo")];
     let result = parse(tokens.as_slice());
 
     assert_eq!(
@@ -120,14 +117,14 @@ fn parses_single_command() {
 #[test]
 fn parses_chained_binary_command() {
     let tokens = vec![
-        Token::Text("echo".to_string()),
-        Token::Text("foo".to_string()),
+        Token::text("echo"),
+        Token::text("foo"),
         Token::Semicolon,
-        Token::Text("echo".to_string()),
-        Token::Text("bar".to_string()),
+        Token::text("echo"),
+        Token::text("bar"),
         Token::Semicolon,
-        Token::Text("echo".to_string()),
-        Token::Text("spam".to_string()),
+        Token::text("echo"),
+        Token::text("spam"),
     ];
     let result = parse(tokens.as_slice());
 
@@ -146,10 +143,10 @@ fn parses_chained_binary_command() {
 #[test]
 fn parses_binary_command_with_trailing_op() {
     let tokens = vec![
-        Token::Text("echo".to_string()),
-        Token::Text("foo".to_string()),
+        Token::text("echo"),
+        Token::text("foo"),
         Token::Semicolon,
-        Token::Text("echo".to_string()),
+        Token::text("echo"),
         Token::Fork,
     ];
     let result = parse(tokens.as_slice());

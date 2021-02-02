@@ -14,3 +14,9 @@ pub enum Token {
     LParen,
     RParen,
 }
+
+impl Token {
+    pub(crate) fn text(text: &str) -> Token {
+        Token::Text(text.to_string())
+    }
+}
