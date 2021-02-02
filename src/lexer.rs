@@ -1,4 +1,4 @@
-use crate::lexer::LexerError::TrailingBackslash;
+use crate::lexer::LexerError::{TrailingBackslash, UnknownOperator};
 use crate::tokens::Token;
 use crate::tokens::Token::*;
 use std::fmt;
@@ -6,17 +6,25 @@ use std::fmt;
 #[derive(Debug, Eq, PartialEq)]
 pub enum LexerError {
     TrailingBackslash,
+    UnknownOperator(String),
 }
 
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LexerError::TrailingBackslash => write!(f, "trailing backslash"),
+            LexerError::UnknownOperator(op) => write!(f, "unknown operator {}", op),
         }
     }
 }
 
-fn is_operator(c: char) -> bool {}
+fn is_operator(c: char) -> bool {
+    return vec!['&', '|', '>', '<', ';'].contains(&c);
+}
+
+fn is_text(c: char) -> bool {
+    return c.is_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/';
+}
 
 fn read_text(mut in_str: &str) -> Result<(&str, String), LexerError> {
     let mut acc: Vec<char> = vec![];
@@ -31,7 +39,7 @@ fn read_text(mut in_str: &str) -> Result<(&str, String), LexerError> {
                 None => Err(TrailingBackslash)?,
                 Some(c) => acc.push(c),
             };
-        } else if c.is_whitespace() || !c.is_alphanumeric() {
+        } else if !is_text(c) {
             break;
         } else {
             acc.push(c);
@@ -39,6 +47,15 @@ fn read_text(mut in_str: &str) -> Result<(&str, String), LexerError> {
         in_str = &in_str[1..];
     }
     Ok((&in_str, acc.into_iter().collect()))
+}
+
+fn read_operator(mut in_str: &str, operator: char) -> (&str, i8) {
+    let mut repetitions = 0;
+    while in_str.chars().next() == Some(operator) {
+        repetitions += 1;
+        in_str = &in_str[1..];
+    }
+    (in_str, repetitions)
 }
 
 fn skip_whitespace(mut in_str: &str) -> &str {
@@ -53,16 +70,32 @@ fn skip_whitespace(mut in_str: &str) -> &str {
 }
 
 pub fn lex(mut input: &str) -> Result<Vec<Token>, LexerError> {
-    let mut tokens = vec![];
+    let mut tokens: Vec<Token> = vec![];
     loop {
-        input = match &input.get(0..1) {
-            Some(" ") => skip_whitespace(input),
+        let c = match input.chars().next() {
             None => break,
-            _ => {
-                let (t, text) = read_text(input)?;
-                tokens.push(Text(text));
-                t
-            }
+            Some(c) => c,
+        };
+        if c.is_whitespace() {
+            input = skip_whitespace(input);
+        } else if is_text(c) {
+            let (t, text) = read_text(input)?;
+            tokens.push(Token::Text(text));
+            input = t;
+        } else if is_operator(c) {
+            let (t, repetitions) = read_operator(input, c);
+            let token = match (c, repetitions) {
+                ('&', 1) => Token::Fork,
+                ('&', 2) => Token::LogAnd,
+                ('|', 1) => Token::Pipe,
+                ('|', 2) => Token::LogOr,
+                ('>', 1) => Token::WriteFile,
+                ('>', 2) => Token::AppendFile,
+                (';', 1) => Token::Semicolon,
+                _ => Err(UnknownOperator((0..repetitions).map(|_| c).collect()))?,
+            };
+            tokens.push(token);
+            input = t;
         }
     }
     Ok(tokens)

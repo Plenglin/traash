@@ -40,9 +40,7 @@ impl Parser<'_> {
             stack: vec![],
         }
     }
-}
 
-impl Parser<'_> {
     fn reduce_single(self: &mut Self) -> Command {
         let mut args: Vec<String> = vec![];
         while let Some(Symbol::Text(str)) = self.stack.last() {
