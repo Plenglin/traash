@@ -1,6 +1,7 @@
 use crate::ast::BinaryOp::LogAnd;
 use crate::ast::Command::Nil;
 use crate::ast::{binary, fork, log_and, sequential, single, BinaryOp, Command, SingleCommand};
+use crate::lexer::lex;
 use crate::parser::Command::Single;
 use crate::parser::ParserError::{ExtraRParen, MissingRParen};
 use crate::tokens::Token;
@@ -272,6 +273,25 @@ fn parses_happy_command_with_nested_parentheses() {
         Token::text("apt"),
         Token::RParen,
     ];
+    let result = parse(tokens.as_slice()).unwrap();
+
+    assert_eq!(
+        result,
+        sequential(
+            single(vec!["uptime".to_string()]),
+            log_and(
+                fork(single(vec!["echo".to_string()]), Nil),
+                single(vec!["apt".to_string()]),
+            )
+        )
+    );
+}
+
+#[test]
+fn fullstack_parse() {
+    let input = "uptime;(( echo &) && apt)";
+
+    let tokens = lex(input).unwrap();
     let result = parse(tokens.as_slice()).unwrap();
 
     assert_eq!(

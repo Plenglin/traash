@@ -113,6 +113,24 @@ pub fn lex(mut input: &str) -> Result<Vec<Token>, LexerError> {
 }
 
 #[test]
+fn lexes_empty() {
+    let in_str = "";
+
+    let output = lex(in_str).unwrap();
+
+    assert_eq!(output, vec![]);
+}
+
+#[test]
+fn lexes_whitespace() {
+    let in_str = "\t";
+
+    let output = lex(in_str).unwrap();
+
+    assert_eq!(output, vec![]);
+}
+
+#[test]
 fn lexes_fork_command() {
     let in_str = "echo this is a --test & cat ./foo.bar > carp";
 
