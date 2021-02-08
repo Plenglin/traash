@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{CStr, CString, NulError};
 use std::os::unix::io::RawFd;
 
 use libc::WEXITED;
@@ -9,7 +9,6 @@ use nix::unistd::{dup2, execv, fork, pipe, ForkResult, Pid};
 use nix::{libc, Error};
 
 use crate::ast::{BinaryExpr, BinaryOp, Command, SingleCommand};
-use crate::executor::ProcessType::Attached;
 
 pub struct StreamSet {
     stdin: Option<RawFd>,
@@ -18,7 +17,7 @@ pub struct StreamSet {
 }
 
 impl StreamSet {
-    fn get_default() -> StreamSet {
+    pub fn std() -> StreamSet {
         StreamSet {
             stdin: Some(0),
             stdout: Some(1),
@@ -26,7 +25,7 @@ impl StreamSet {
         }
     }
 
-    fn pipe(self: StreamSet) -> (StreamSet, StreamSet) {
+    pub fn pipe(self: StreamSet) -> (StreamSet, StreamSet) {
         let (r_stdin, l_stdout) = pipe().unwrap();
         (
             StreamSet {
@@ -42,7 +41,7 @@ impl StreamSet {
         )
     }
 
-    fn fork(self: StreamSet) -> (StreamSet, StreamSet) {
+    pub fn fork(self: StreamSet) -> (StreamSet, StreamSet) {
         (
             StreamSet {
                 stdin: None,
@@ -58,6 +57,21 @@ impl StreamSet {
     }
 }
 
+pub enum ProcessSpawnError {
+    NixError(nix::Error),
+    NulError(NulError),
+}
+impl From<nix::Error> for ProcessSpawnError {
+    fn from(err: Error) -> Self {
+        ProcessSpawnError::NixError(err)
+    }
+}
+impl From<NulError> for ProcessSpawnError {
+    fn from(err: NulError) -> Self {
+        ProcessSpawnError::NulError(err)
+    }
+}
+
 pub struct Process {
     pid: Pid,
     attached: bool,
@@ -67,25 +81,35 @@ pub struct Process {
 impl Drop for Process {
     fn drop(&mut self) {
         if self.attached {
-            kill(pid, SIGTERM);
+            kill(self.pid, SIGTERM);
         }
     }
 }
 
 impl Process {
-    fn spawn(cmd: SingleCommand, attached: bool, streams: StreamSet) -> Process {
+    fn spawn(
+        cmd: SingleCommand,
+        attached: bool,
+        streams: StreamSet,
+    ) -> Result<Process, ProcessSpawnError> {
         unsafe {
             match fork()? {
                 ForkResult::Parent { child } => {
-                    return Process {
+                    return Ok(Process {
                         pid: child,
                         attached,
                         streams,
-                    }
+                    })
                 }
                 ForkResult::Child => {
-                    let path = CString::from(&cmd.args[0]);
-                    execv(path.as_c_str(), &cmd.args[1..]);
+                    let path = CString::new(cmd.args[0].as_str())?;
+                    /* let argv = cmd
+                    .args
+                    .into_iter()
+                    .skip(1)
+                    .map(|x| CString::new(x.as_str()) as Result<CString, NulError>)
+                    .collect();*/
+                    execv(path.as_c_str(), &[]);
                     panic!("code after execv() should never happen!");
                 }
             }
@@ -93,16 +117,25 @@ impl Process {
     }
 }
 
-unsafe fn execute_binary(binary: BinaryExpr, streams: StreamSet) {
+unsafe fn execute_single(
+    command: SingleCommand,
+    streams: StreamSet,
+) -> Result<i32, ProcessSpawnError> {
+    let p = Process::spawn(command, true, streams)?;
+    waitpid(p, WaitPidFlag::from_bits(WEXITED));
+}
+
+unsafe fn execute_binary(binary: BinaryExpr, streams: StreamSet) -> Result<i32, ProcessSpawnError> {
     match binary.op {
         BinaryOp::Fork => {
-            execute(*binary.first);
-            execute(*binary.second);
+            let (l, r) = streams.fork();
+            execute(*binary.first, l);
+            Ok(execute(*binary.second, r))
         }
         BinaryOp::Seq => {
-            let first = execute(*binary.first);
+            let first = execute(*binary.first, streams);
             waitpid(first, WaitPidFlag::from_bits(WEXITED));
-            let second = execute(*binary.second);
+            let second = execute(*binary.second, streams.clone());
             waitpid(second, WaitPidFlag::from_bits(WEXITED));
         }
         BinaryOp::Pipe => {
@@ -116,12 +149,12 @@ unsafe fn execute_binary(binary: BinaryExpr, streams: StreamSet) {
     }
 }
 
-fn execute(cmd: Command, streams: StreamSet) {
+pub fn execute(cmd: Command, streams: StreamSet) {
     unsafe {
         match cmd {
             Command::Nil => {}
-            Command::Single(c) => execute_single(c),
-            Command::BinaryExpr(c) => execute_binary(c),
+            Command::Single(c) => execute_single(c, streams),
+            Command::BinaryExpr(c) => execute_binary(c, streams),
             Command::FileInput(_) => {}
             Command::FileOutput(_) => {}
         }
